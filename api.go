@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/docker/docker/daemon/logger"
-	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
@@ -49,24 +47,24 @@ func newHandler(d *driver) *handler {
 
 func (h *handler) startLogging(w http.ResponseWriter, r *http.Request) {
 	var req startLoggingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := sdk.DecodeRequest(w, r, &req); err != nil {
 		return
 	}
+
 	log.WithField("file", req.File).WithField("containerID", req.Info.ContainerID).Infof("startLogging")
 	h.d.startLogging(req.File, req.Info)
-	h.respond(nil, w)
+	sdk.EncodeResponse(w, nil, false)
 }
 
 func (h *handler) stopLogging(w http.ResponseWriter, r *http.Request) {
 	var req stopLoggingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := sdk.DecodeRequest(w, r, &req); err != nil {
 		return
 	}
+
 	log.WithField("file", req.File).Infof("stopLogging")
 	h.d.stopLogging(req.File)
-	h.respond(nil, w)
+	sdk.EncodeResponse(w, nil, false)
 }
 
 func (h *handler) capabilities(w http.ResponseWriter, r *http.Request) {
@@ -78,21 +76,11 @@ func (h *handler) capabilities(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) readLogs(w http.ResponseWriter, r *http.Request) {
 	var req readLogsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := sdk.DecodeRequest(w, r, &req); err != nil {
 		return
 	}
+
 	log.WithField("ContainerID", req.Info.ContainerID).Infof("readLogs")
-
-	w.Header().Set("Content-Type", "application/x-json-stream")
 	stream := h.d.readLogs(req.Info, req.Config)
-	io.Copy(ioutils.NewWriteFlusher(w), stream)
-}
-
-func (h *handler) respond(err error, w http.ResponseWriter) {
-	var res response
-	if err != nil {
-		res.Err = err.Error()
-	}
-	json.NewEncoder(w).Encode(&res)
+	sdk.StreamResponse(w, stream)
 }
