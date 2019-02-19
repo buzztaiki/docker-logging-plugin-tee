@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -35,11 +34,12 @@ type response struct {
 }
 
 type handler struct {
+	d *driver
 	sdk.Handler
 }
 
-func newHandler() *handler {
-	h := &handler{sdk.NewHandler(`{"Implements": ["LoggingDriver"]}`)}
+func newHandler(d *driver) *handler {
+	h := &handler{d, sdk.NewHandler(`{"Implements": ["LoggingDriver"]}`)}
 	h.HandleFunc("/LogDriver.StartLogging", h.startLogging)
 	h.HandleFunc("/LogDriver.StopLogging", h.stopLogging)
 	h.HandleFunc("/LogDriver.Capabilities", h.capabilities)
@@ -54,6 +54,7 @@ func (h *handler) startLogging(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.WithField("file", req.File).WithField("containerID", req.Info.ContainerID).Infof("startLogging")
+	h.d.startLogging(req.File, req.Info)
 	h.respond(nil, w)
 }
 
@@ -64,6 +65,7 @@ func (h *handler) stopLogging(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.WithField("file", req.File).Infof("stopLogging")
+	h.d.stopLogging(req.File)
 	h.respond(nil, w)
 }
 
@@ -82,10 +84,9 @@ func (h *handler) readLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	log.WithField("ContainerID", req.Info.ContainerID).Infof("readLogs")
 
-	stream := bytes.NewBuffer([]byte{})
 	w.Header().Set("Content-Type", "application/x-json-stream")
-	wf := ioutils.NewWriteFlusher(w)
-	io.Copy(wf, stream)
+	stream := h.d.readLogs(req.Info, req.Config)
+	io.Copy(ioutils.NewWriteFlusher(w), stream)
 }
 
 func (h *handler) respond(err error, w http.ResponseWriter) {

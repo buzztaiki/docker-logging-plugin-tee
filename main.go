@@ -16,7 +16,7 @@ func init() {
 }
 
 func main() {
-	h := newHandler()
+	h := newHandler(newDriver())
 	if err := h.ServeUnix(pluginName, 0); err != nil {
 		panic(err)
 	}
