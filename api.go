@@ -52,8 +52,8 @@ func (h *handler) startLogging(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.WithField("file", req.File).WithField("containerID", req.Info.ContainerID).Infof("startLogging")
-	h.d.startLogging(req.File, req.Info)
-	sdk.EncodeResponse(w, nil, false)
+	err := h.d.startLogging(req.File, req.Info)
+	h.encodeResponse(w, err)
 }
 
 func (h *handler) stopLogging(w http.ResponseWriter, r *http.Request) {
@@ -63,14 +63,14 @@ func (h *handler) stopLogging(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.WithField("file", req.File).Infof("stopLogging")
-	h.d.stopLogging(req.File)
-	sdk.EncodeResponse(w, nil, false)
+	err := h.d.stopLogging(req.File)
+	h.encodeResponse(w, err)
 }
 
 func (h *handler) capabilities(w http.ResponseWriter, r *http.Request) {
 	log.Infof("capabilities")
 	json.NewEncoder(w).Encode(&capabilitiesResponse{
-		Cap: logger.Capability{ReadLogs: true},
+		Cap: h.d.capabilities(),
 	})
 }
 
@@ -81,6 +81,18 @@ func (h *handler) readLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.WithField("ContainerID", req.Info.ContainerID).Infof("readLogs")
-	stream := h.d.readLogs(req.Info, req.Config)
-	sdk.StreamResponse(w, stream)
+	stream, err := h.d.readLogs(req.Info, req.Config)
+	if err != nil {
+		h.encodeResponse(w, err)
+	} else {
+		sdk.StreamResponse(w, stream)
+	}
+}
+
+func (h *handler) encodeResponse(w http.ResponseWriter, err error) {
+	if err != nil {
+		sdk.EncodeResponse(w, &response{Err: err.Error()}, true)
+	} else {
+		sdk.EncodeResponse(w, &response{Err: ""}, false)
+	}
 }
