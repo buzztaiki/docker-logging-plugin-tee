@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"context"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-plugins-helpers/sdk"
@@ -83,7 +84,11 @@ func (h *handler) readLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.WithField("ContainerID", req.Info.ContainerID).Infof("readLogs")
-	stream, err := h.d.readLogs(req.Info, req.Config)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stream, err := h.d.readLogs(ctx, req.Info, req.Config)
+
 	if err != nil {
 		h.encodeResponse(w, err)
 	} else {
