@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
@@ -85,7 +87,14 @@ func (h *handler) readLogs(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.encodeResponse(w, err)
 	} else {
-		sdk.StreamResponse(w, stream)
+		if req.Config.Follow {
+			defer stream.Close()
+			// Don't use sdk.StreamResponse for flushing.
+			w.Header().Set("Content-Type", sdk.DefaultContentTypeV1_1)
+			io.Copy(ioutils.NewWriteFlusher(w), stream)
+		} else {
+			sdk.StreamResponse(w, stream)
+		}
 	}
 }
 
