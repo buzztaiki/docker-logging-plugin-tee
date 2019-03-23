@@ -2,6 +2,9 @@
   "description": "docker log driver tee plugin",
   "documentation": "https://github.com/buzztaiki/docker-log-driver-tee",
   "entrypoint": ["/usr/bin/docker-log-driver-tee"],
+  "network": {
+    "type": "host"
+  },
   "interface": {
     "types": ["docker.logdriver/1.0"],
     "socket": "tee.sock"
