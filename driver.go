@@ -10,8 +10,10 @@ import (
 	"syscall"
 
 	"github.com/containerd/fifo"
+	"github.com/docker/docker/api/types/plugins/logdriver"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/pkg/errors"
+	"time"
 )
 
 type driver struct {
@@ -50,7 +52,7 @@ func (d *driver) startLogging(file string, info logger.Info) error {
 	d.loggers[info.ContainerID] = l
 	d.mu.Unlock()
 
-	go copyToLogger(r, l)
+	go doLog(r, l)
 	return nil
 }
 
@@ -81,7 +83,7 @@ func (d *driver) readLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 	}
 
 	r, w := io.Pipe()
-	go copyFromLogReader(lr, w)
+	go doReadLogs(lr, config, w)
 	return r, nil
 }
 
@@ -93,8 +95,66 @@ func openFifo(file string) (io.ReadCloser, error) {
 	return fifo.OpenFifo(context.Background(), file, syscall.O_RDONLY, 0)
 }
 
-func copyToLogger(r io.Reader, l logger.Logger) {
+func doLog(r io.ReadCloser, l logger.Logger) {
+	defer r.Close()
+	defer l.Close()
+
+	dec := logdriver.NewLogEntryDecoder(r)
+	var buf logdriver.LogEntry
+	for {
+		if err := dec.Decode(&buf); err != nil {
+			if err == io.EOF {
+				return
+			}
+			log.WithError(err).Error("failed to write log")
+			return
+		}
+		msg := &logger.Message{
+			Timestamp: time.Unix(0, buf.TimeNano),
+			Line:      buf.Line,
+			Source:    buf.Source,
+		}
+		l.Log(msg)
+	}
 }
 
-func copyFromLogReader(l logger.LogReader, w io.Writer) {
+func doReadLogs(lr logger.LogReader, config logger.ReadConfig, w io.WriteCloser) {
+	defer w.Close()
+	watcher := lr.ReadLogs(config)
+	defer watcher.ConsumerGone()
+
+	enc := logdriver.NewLogEntryEncoder(w)
+	var buf logdriver.LogEntry
+	for {
+		select {
+		case msg, ok := <-watcher.Msg:
+			if !ok {
+				log.Info("stop reading")
+				return
+			}
+			buf.Line = msg.Line
+			buf.TimeNano = msg.Timestamp.UnixNano()
+			if msg.PLogMetaData != nil {
+				buf.Partial = true
+				buf.PartialLogMetadata = &logdriver.PartialLogEntryMetadata{
+					Id:      msg.PLogMetaData.ID,
+					Last:    msg.PLogMetaData.Last,
+					Ordinal: int32(msg.PLogMetaData.Ordinal),
+				}
+			}
+			buf.Source = msg.Source
+
+			if err := enc.Encode(&buf); err != nil {
+				log.WithError(err).Error("encode error")
+				return
+			}
+			buf.Reset()
+		case err := <-watcher.Err:
+			log.WithError(err).Error("watcher error")
+			return
+		case <-watcher.WatchProducerGone():
+			log.Info("producer gone")
+			return
+		}
+	}
 }
