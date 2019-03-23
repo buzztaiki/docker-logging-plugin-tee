@@ -11,7 +11,6 @@ import (
 
 	"github.com/containerd/fifo"
 	"github.com/docker/docker/daemon/logger"
-	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/pkg/errors"
 )
 
@@ -37,7 +36,7 @@ func (d *driver) startLogging(file string, info logger.Info) error {
 		info.LogPath = filepath.Join(logDir, info.ContainerID)
 	}
 
-	l, err := newLogger(info)
+	l, err := newTeeLogger(info)
 	if err != nil {
 		return errors.Wrap(err, "failed to create logger")
 	}
@@ -88,10 +87,6 @@ func (d *driver) readLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 
 func (d *driver) capabilities() logger.Capability {
 	return logger.Capability{ReadLogs: true}
-}
-
-func newLogger(info logger.Info) (logger.Logger, error) {
-	return jsonfilelog.New(info)
 }
 
 func openFifo(file string) (io.ReadCloser, error) {
