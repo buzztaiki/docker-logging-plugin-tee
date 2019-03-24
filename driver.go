@@ -118,11 +118,10 @@ func doLog(ctx context.Context, r io.ReadCloser, l logger.Logger) {
 				log.WithError(err).Error("failed to write log")
 				return
 			}
-			msg := &logger.Message{
-				Timestamp: time.Unix(0, buf.TimeNano),
-				Line:      buf.Line,
-				Source:    buf.Source,
-			}
+			msg := logger.NewMessage()
+			msg.Timestamp = time.Unix(0, buf.TimeNano)
+			msg.Line = buf.Line
+			msg.Source = buf.Source
 			l.Log(msg)
 		}
 	}

@@ -101,6 +101,8 @@ func (l *teeLogger) Log(msg *logger.Message) error {
 		// get message from pool to reduce message pool size
 		logger.NewMessage()
 	}
+	logger.PutMessage(msg)
+
 	if len(errs) != 0 {
 		return newMultipleError("faild to log on some loggers", errs)
 	}
