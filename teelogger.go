@@ -92,7 +92,11 @@ func driverConfig(driverName string, config map[string]string) map[string]string
 func (l *teeLogger) Log(msg *logger.Message) error {
 	errs := []error{}
 	for _, lg := range l.loggers {
-		if err := lg.Log(msg); err != nil {
+		// copy message before logging to against resetting.
+		// see https://github.com/moby/moby/blob/e4cc3adf81cc0810a416e2b8ce8eb4971e17a3a3/daemon/logger/logger.go#L40
+		// TODO this implementation increase message pool size too large.
+		m := *msg
+		if err := lg.Log(&m); err != nil {
 			errs = append(errs, err)
 		}
 	}
