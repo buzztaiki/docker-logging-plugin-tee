@@ -1,4 +1,4 @@
-PLUGIN_NAME = buzztaiki/docker-log-driver-tee
+PLUGIN_NAME = buzztaiki/logging-plugin-tee
 PLUGIN_TAG ?= development
 TMP_CONTAINER_NAME := tmp-$(shell echo $$$$)
 
