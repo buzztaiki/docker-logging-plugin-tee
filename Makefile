@@ -24,3 +24,6 @@ install: rootfs
 	docker plugin rm -f $(PLUGIN_NAME):$(PLUGIN_TAG) || true
 	docker plugin create $(PLUGIN_NAME):$(PLUGIN_TAG) ./plugin
 	docker plugin enable $(PLUGIN_NAME):$(PLUGIN_TAG)
+
+push: clean install
+	docker plugin push $(PLUGIN_NAME):$(PLUGIN_TAG)
