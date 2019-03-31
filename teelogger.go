@@ -32,7 +32,6 @@ func (e *multipleError) Error() string {
 	return buf.String()
 }
 
-// --log-opt drivers=json-file,local --log-opt json-file:
 func newTeeLogger(info logger.Info) (*teeLogger, error) {
 	names, err := driverNames(info.Config)
 	if err != nil {
@@ -70,7 +69,7 @@ func newTeeLogger(info logger.Info) (*teeLogger, error) {
 }
 
 func driverNames(config map[string]string) ([]string, error) {
-	if s, ok := config["drivers"]; ok {
+	if s, ok := config["tee-drivers"]; ok {
 		return strings.Split(s, ","), nil
 	}
 	return nil, errNoSuchDrivers
